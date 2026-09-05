@@ -1,0 +1,6 @@
+﻿*.html
+*_files/
+erro_log.txt
+history.json
+.buildozer/
+bin/
