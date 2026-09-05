@@ -1,1 +1,3 @@
 kivy==2.3.0
+cython==0.29.36
+urllib3

@@ -1,156 +1,188 @@
-import json, os, random
-from collections import Counter
+import random
+import json
+import os
+from datetime import datetime
+import urllib.request
+
 from kivy.app import App
-from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
+from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
+from kivy.uix.button import Button
 from kivy.uix.scrollview import ScrollView
-from kivy.uix.textinput import TextInput
+from kivy.core.window import Window
+from kivy.graphics import Color, RoundedRectangle
 
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
-HISTORY_FILE = os.path.join(APP_DIR, "history.json")
+Window.clearcolor = (0.06, 0.09, 0.16, 1)
 
-SAMPLE_RESULTS = [
-    [4,11,23,37,44,58],[2,9,18,31,47,53],[7,14,21,32,45,60],
-    [1,12,26,35,41,54],[5,16,22,34,49,57],[3,10,27,38,43,55],
-    [6,15,24,36,48,52],[8,13,20,29,42,59],[11,17,25,33,46,56],
-    [4,19,28,30,40,51]
-]
+class StyledButton(Button):
+    def __init__(self, bg_color=(0.06, 0.72, 0.51, 1), **kwargs):
+        super().__init__(**kwargs)
+        self.background_normal = ''
+        self.background_color = (0, 0, 0, 0)
+        self.bg_color = bg_color
+        self.font_size = '16sp'
+        self.bold = True
+        self.color = (1, 1, 1, 1)
+        self.bind(pos=self.update_canvas, size=self.update_canvas)
 
-def normalize_result(nums):
-    nums = sorted(set(int(x) for x in nums))
-    if len(nums) != 6 or any(x < 1 or x > 60 for x in nums):
-        raise ValueError("Digite 6 números diferentes entre 1 e 60.")
-    return nums
+    def update_canvas(self, *args):
+        self.canvas.before.clear()
+        with self.canvas.before:
+            Color(*self.bg_color)
+            RoundedRectangle(pos=self.pos, size=self.size, radius=[8])
 
-def save_history(history):
-    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(history, f, ensure_ascii=False, indent=2)
-
-def load_history():
-    if not os.path.exists(HISTORY_FILE):
-        save_history(SAMPLE_RESULTS)
-    try:
-        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            return [normalize_result(x) for x in json.load(f)]
-    except Exception:
-        return SAMPLE_RESULTS[:]
-
-def frequency(history):
-    c = Counter()
-    for draw in history:
-        c.update(draw)
-    return c
-
-def score_game(game, history):
-    freq = frequency(history)
-    avg = sum(freq.values()) / 60.0
-    freq_score = 100 - min(100, sum(abs(freq[x]-avg) for x in game) / max(1, len(history)*0.45))
-    odd = sum(x % 2 for x in game)
-    parity_score = 100 if odd in (2,3,4) else 55
-    decades = [sum(1 for x in game if start <= x <= start+9) for start in (1,11,21,31,41,51)]
-    distribution_score = 100 if max(decades) <= 2 else 75 if max(decades) == 3 else 45
-    total = sum(game)
-    sum_score = 100 if 120 <= total <= 240 else 65
-    runs = sum(1 for a,b in zip(game, game[1:]) if b == a+1)
-    consecutive_score = 100 if runs <= 1 else 70 if runs == 2 else 45
-    return max(0, min(100, round(
-        .30*freq_score + .20*parity_score + .20*distribution_score +
-        .15*sum_score + .15*consecutive_score)))
-
-def generate_game(history):
-    freq = frequency(history)
-    pool = list(range(1,61))
-    weights = [max(1, freq[x]+2) for x in pool]
-    while True:
-        g = tuple(sorted(random.choices(pool, weights=weights, k=6)))
-        if len(set(g)) == 6:
-            return g
-
-def generate_best(history, amount=10):
-    candidates, seen = [], set()
-    for _ in range(max(300, amount*80)):
-        g = generate_game(history)
-        if g not in seen:
-            seen.add(g)
-            candidates.append((score_game(g, history), g))
-    candidates.sort(reverse=True)
-    result = []
-    for score, game in candidates:
-        if all(len(set(game)&set(old)) <= 4 for _,old in result):
-            result.append((score,game))
-        if len(result) >= amount:
-            break
-    return result
-
-class MegaAnalyzer(App):
-    title = "Mega Analyzer"
-
+class MegaSenaApp(App):
     def build(self):
-        self.history = load_history()
-        root = BoxLayout(orientation="vertical", padding=dp(10), spacing=dp(8))
-        root.add_widget(Label(text="[b]MEGA ANALYZER[/b]\nAnalisador estatístico",
-                              markup=True, size_hint_y=None, height=dp(65), font_size="20sp"))
-        self.output = Label(text="", markup=True, halign="left", valign="top",
-                            size_hint_y=None, font_size="15sp")
-        self.output.bind(texture_size=lambda o,s:setattr(o,"height",s[1]+dp(20)))
+        self.history_file = "history.json"
+        self.load_history()
+
+        root = BoxLayout(orientation='vertical', padding=15, spacing=12)
+
+        # Header
+        title = Label(
+            text="[b]MEGA-SENA ANALISADOR[/b]", 
+            markup=True, 
+            font_size='22sp', 
+            color=(0.22, 0.74, 0.97, 1),
+            size_hint_y=None, 
+            height=40
+        )
+        root.add_widget(title)
+
+        # Painel do Jogo Atual
+        self.game_panel = Label(
+            text="Clique em 'Gerar Novo Jogo' para iniciar",
+            font_size='15sp',
+            color=(0.95, 0.96, 0.98, 1),
+            size_hint_y=None,
+            height=60
+        )
+        root.add_widget(self.game_panel)
+
+        # Botões de Ação
+        btn_layout = BoxLayout(spacing=10, size_hint_y=None, height=50)
+        
+        btn_generate = StyledButton(text="🎲 Gerar Novo Jogo", bg_color=(0.06, 0.72, 0.51, 1))
+        btn_generate.bind(on_press=self.generate_game)
+        
+        btn_check = StyledButton(text="🌐 Conferir Resultados", bg_color=(0.15, 0.39, 0.92, 1))
+        btn_check.bind(on_press=self.check_online_results)
+        
+        btn_layout.add_widget(btn_generate)
+        btn_layout.add_widget(btn_check)
+        root.add_widget(btn_layout)
+
+        # Status / Feedback
+        self.status_label = Label(
+            text="Status: Pronto", 
+            font_size='13sp', 
+            color=(0.58, 0.64, 0.72, 1),
+            size_hint_y=None, 
+            height=30
+        )
+        root.add_widget(self.status_label)
+
+        # Área de Histórico
+        hist_title = Label(
+            text="[b]Meus Jogos Salvos e Resultados[/b]", 
+            markup=True, 
+            font_size='16sp', 
+            color=(0.95, 0.96, 0.98, 1),
+            size_hint_y=None, 
+            height=30
+        )
+        root.add_widget(hist_title)
+
         scroll = ScrollView()
-        scroll.add_widget(self.output)
+        self.history_layout = GridLayout(cols=1, spacing=8, size_hint_y=None)
+        self.history_layout.bind(minimum_height=self.history_layout.setter('height'))
+        scroll.add_widget(self.history_layout)
         root.add_widget(scroll)
-        buttons = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(5))
-        for text, cb in [("Gerar 1",self.generate_one),("Gerar 10",self.generate_ten),
-                         ("Analisar",self.analyze),("Adicionar",self.add_result)]:
-            b=Button(text=text); b.bind(on_release=cb); buttons.add_widget(b)
-        root.add_widget(buttons)
-        self.refresh_home()
+
+        self.refresh_history_ui()
         return root
 
-    def refresh_home(self):
-        f=frequency(self.history)
-        hot=sorted(range(1,61),key=lambda x:(-f[x],x))[:10]
-        cold=sorted(range(1,61),key=lambda x:(f[x],x))[:10]
-        self.output.text=(f"[b]Concursos cadastrados:[/b] {len(self.history)}\n\n"
-                          f"[b]Mais frequentes:[/b] {', '.join(f'{x:02d}' for x in hot)}\n"
-                          f"[b]Menos frequentes:[/b] {', '.join(f'{x:02d}' for x in cold)}\n\n"
-                          "[i]O índice não é probabilidade de acerto.[/i]")
+    def generate_game(self, instance):
+        numbers = sorted(random.sample(range(1, 61), 6))
+        str_numbers = " - ".join(f"{n:02d}" for n in numbers)
+        now = datetime.now().strftime("%d/%m/%Y %H:%M")
 
-    def generate_one(self,*_):
-        score,nums=generate_best(self.history,1)[0]
-        self.output.text=(f"[b]JOGO GERADO[/b]\n\n[b]{' - '.join(f'{x:02d}' for x in nums)}[/b]\n\n"
-                          f"Índice estatístico: [b]{score}/100[/b]\n\n"
-                          "Não significa 80% de chance de ganhar.")
+        game_data = {"data": now, "dezenas": numbers, "str_dezenas": str_numbers}
+        self.history.insert(0, game_data)
+        self.save_history()
 
-    def generate_ten(self,*_):
-        games=generate_best(self.history,10)
-        self.output.text="[b]10 JOGOS GERADOS[/b]\n\n" + "\n".join(
-            f"{i:02d}. {' - '.join(f'{x:02d}' for x in nums)}  ({score}/100)"
-            for i,(score,nums) in enumerate(games,1))
+        self.game_panel.text = f"Novo Jogo Gerado:\n[b][color=34d399]{str_numbers}[/color][/b]"
+        self.game_panel.markup = True
+        self.status_label.text = "Status: Jogo gerado e salvo com sucesso!"
+        self.refresh_history_ui()
 
-    def analyze(self,*_):
-        f=frequency(self.history)
-        hot=sorted(range(1,61),key=lambda x:(-f[x],x))[:15]
-        cold=sorted(range(1,61),key=lambda x:(f[x],x))[:15]
-        self.output.text=(f"[b]ANÁLISE[/b]\n\nConcursos: {len(self.history)}\n\n"
-                          "[b]Mais frequentes[/b]\n"+", ".join(f"{x:02d} ({f[x]})" for x in hot)+
-                          "\n\n[b]Menos frequentes[/b]\n"+", ".join(f"{x:02d} ({f[x]})" for x in cold))
+    def check_online_results(self, instance):
+        self.status_label.text = "Status: Conectando à API da Loterias Caixa..."
+        try:
+            url = "https://loteriascaixa-api.herokuapp.com/api/megasena/latest"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read().decode())
+                
+            dezenas_sorteadas = [int(n) for n in data.get('dezenas', [])]
+            concurso = data.get('concurso', 'N/A')
+            
+            if not dezenas_sorteadas:
+                raise Exception("Dados inválidos recebidos.")
 
-    def add_result(self,*_):
-        from kivy.uix.popup import Popup
-        box=BoxLayout(orientation="vertical",padding=dp(10),spacing=dp(8))
-        inp=TextInput(hint_text="Ex.: 04 11 23 37 44 58",multiline=False,
-                      size_hint_y=None,height=dp(50))
-        box.add_widget(Label(text="Digite os 6 números:")); box.add_widget(inp)
-        btn=Button(text="Salvar",size_hint_y=None,height=dp(50)); box.add_widget(btn)
-        popup=Popup(title="Adicionar concurso",content=box,size_hint=(.9,.45))
-        def save(*_):
+            str_sorteadas = " - ".join(f"{n:02d}" for n in dezenas_sorteadas)
+            self.status_label.text = f"Concurso {concurso} | Sorteio: {str_sorteadas}"
+            self.refresh_history_ui(dezenas_sorteadas)
+
+        except Exception as e:
+            self.status_label.text = f"Erro na conexão: Não foi possível obter o resultado."
+
+    def refresh_history_ui(self, sorteadas=None):
+        self.history_layout.clear_widgets()
+        if not self.history:
+            lbl = Label(text="Nenhum jogo salvo ainda.", color=(0.58, 0.64, 0.72, 1), size_hint_y=None, height=30)
+            self.history_layout.add_widget(lbl)
+            return
+
+        for item in self.history:
+            dezenas = item['dezenas']
+            str_dezenas = item['str_dezenas']
+            data_str = item['data']
+            
+            card_text = f" Data: {data_str} | Apostas: {str_dezenas}"
+            
+            if sorteadas:
+                acertos = set(dezenas).intersection(set(sorteadas))
+                qtd = len(acertos)
+                if qtd >= 4:
+                    card_text += f"\n 🎯 [color=34d399][b]GANHOU! {qtd} ACERTOS![/b][/color]"
+                else:
+                    card_text += f"\n 📊 Acertos: {qtd}"
+
+            card = Label(
+                text=card_text, 
+                markup=True,
+                font_size='13sp', 
+                size_hint_y=None, 
+                height=50,
+                color=(0.88, 0.91, 0.95, 1)
+            )
+            self.history_layout.add_widget(card)
+
+    def load_history(self):
+        if os.path.exists(self.history_file):
             try:
-                nums=normalize_result(inp.text.replace(","," ").split())
-                self.history.append(nums); save_history(self.history)
-                popup.dismiss(); self.refresh_home()
-            except Exception as e:
-                inp.text=""; inp.hint_text=str(e)
-        btn.bind(on_release=save); popup.open()
+                with open(self.history_file, 'r') as f:
+                    self.history = json.load(f)
+            except:
+                self.history = []
+        else:
+            self.history = []
 
-if __name__ == "__main__":
-    MegaAnalyzer().run()
+    def save_history(self):
+        with open(self.history_file, 'w') as f:
+            json.dump(self.history, f, indent=4)
+
+if __name__ == '__main__':
+    MegaSenaApp().run()
