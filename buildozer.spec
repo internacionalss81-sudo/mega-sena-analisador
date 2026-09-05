@@ -9,7 +9,7 @@ requirements = python3,kivy,urllib3,requests
 orientation = portrait
 android.api = 33
 android.minapi = 21
-android.archs = arm64-v8a, armeabi-v7aandroid.allow_backup = True
+android.archs = arm64-v8a, armeabi-v7a android.allow_backup = True
 android.private_storage = True
 p4a.bootstrap = sdl2
 android.accept_sdk_license = True
