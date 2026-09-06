@@ -4,13 +4,20 @@ echo Verificando status do repositorio...
 git status
 
 echo.
-echo Salvando e enviando alteracoes para o GitHub...
+echo Salvando alteracoes locais...
 git add .
 
 set /p commit_message="Digite a mensagem do commit: "
 if "%commit_message%"=="" set commit_message="Atualizacao automatica do projeto"
 
 git commit -m "%commit_message%"
+
+echo.
+echo Sincronizando com o GitHub...
+git pull --rebase origin main
+
+echo.
+echo Enviando para o GitHub...
 git push origin main
 
 echo.
