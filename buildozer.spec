@@ -17,7 +17,7 @@ fullscreen = 0
 android.api = 33
 android.minapi = 21
 android.archs = arm64-v8a
-android.ndk = 25b
+android.ndk = 23b
 
 android.allow_backup = True
 android.private_storage = True

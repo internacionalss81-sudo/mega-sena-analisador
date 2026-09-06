@@ -71,9 +71,6 @@ jobs:
           head -20 .github/workflows/build-apk.yml
 
       - name: Gerar APK
-        env:
-          CFLAGS: "-Wno-error=implicit-function-declaration"
-          CPPFLAGS: "-Wno-error=implicit-function-declaration"
         run: |
           buildozer -v android debug
 
