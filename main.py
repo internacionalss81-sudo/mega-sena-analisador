@@ -6,6 +6,8 @@ import json
 from collections import Counter
 from datetime import datetime
 import urllib.request
+import ssl
+import certifi
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
@@ -16,6 +18,7 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.popup import Popup
 from kivy.core.window import Window
 from kivy.graphics import Color, RoundedRectangle, Rectangle
+from kivy.metrics import dp
 
 Window.clearcolor = (0.06, 0.09, 0.16, 1)
 
@@ -46,7 +49,7 @@ class StyledButton(Button):
         self.background_normal = ''
         self.background_color = (0, 0, 0, 0)
         self.bg_color = bg_color
-        self.font_size = '13sp'
+        self.font_size = '15sp'
         self.bold = True
         self.color = (1, 1, 1, 1)
         self.bind(pos=self.update_canvas, size=self.update_canvas)
@@ -68,7 +71,7 @@ class MegaSenaApp(App):
         self.current_game = "mega_sena"
         self.load_history()
 
-        root = BoxLayout(orientation='vertical', padding=15, spacing=8)
+        root = BoxLayout(orientation='vertical', padding=dp(15), spacing=dp(8))
 
         # Adiciona a imagem de fundo (marca d'água)
         with root.canvas.before:
@@ -91,12 +94,12 @@ class MegaSenaApp(App):
             font_size='19sp',
             color=(0.22, 0.74, 0.97, 1),
             size_hint_y=None,
-            height=32
+            height=dp(36)
         )
         root.add_widget(self.title_label)
 
         # Seletor de modalidade
-        game_selector = BoxLayout(spacing=8, size_hint_y=None, height=42)
+        game_selector = BoxLayout(spacing=dp(8), size_hint_y=None, height=dp(52))
         self.btn_mega = StyledButton(text=GAMES["mega_sena"]["label"], bg_color=GAMES["mega_sena"]["cor"])
         self.btn_mega.bind(on_press=lambda inst: self.select_game("mega_sena"))
         self.btn_loto = StyledButton(text=GAMES["lotofacil"]["label"], bg_color=(0.25, 0.29, 0.38, 1))
@@ -111,12 +114,12 @@ class MegaSenaApp(App):
             font_size='14sp',
             color=(0.95, 0.96, 0.98, 1),
             size_hint_y=None,
-            height=50
+            height=dp(55)
         )
         root.add_widget(self.game_panel)
 
         # Campo para quantidade de jogos múltiplos
-        multi_input_layout = BoxLayout(spacing=10, size_hint_y=None, height=40)
+        multi_input_layout = BoxLayout(spacing=dp(10), size_hint_y=None, height=dp(48))
         input_label = Label(text="Qtd de jogos:", font_size='13sp', size_hint_x=0.4, color=(0.8, 0.85, 0.9, 1))
         self.qty_input = TextInput(text="5", multiline=False, input_filter='int', size_hint_x=0.3, font_size='14sp')
 
@@ -129,7 +132,7 @@ class MegaSenaApp(App):
         root.add_widget(multi_input_layout)
 
         # Botões Principais
-        btn_layout = BoxLayout(spacing=6, size_hint_y=None, height=45)
+        btn_layout = BoxLayout(spacing=dp(6), size_hint_y=None, height=dp(56))
 
         btn_generate = StyledButton(text="🎲 1 Jogo", bg_color=(0.06, 0.72, 0.51, 1))
         btn_generate.bind(on_press=self.generate_single_game)
@@ -155,7 +158,7 @@ class MegaSenaApp(App):
             font_size='12sp',
             color=(0.58, 0.64, 0.72, 1),
             size_hint_y=None,
-            height=25
+            height=dp(28)
         )
         root.add_widget(self.status_label)
 
@@ -166,12 +169,12 @@ class MegaSenaApp(App):
             font_size='15sp',
             color=(0.95, 0.96, 0.98, 1),
             size_hint_y=None,
-            height=25
+            height=dp(28)
         )
         root.add_widget(self.hist_title)
 
         scroll = ScrollView()
-        self.history_layout = GridLayout(cols=1, spacing=6, size_hint_y=None)
+        self.history_layout = GridLayout(cols=1, spacing=dp(6), size_hint_y=None)
         self.history_layout.bind(minimum_height=self.history_layout.setter('height'))
         scroll.add_widget(self.history_layout)
         root.add_widget(scroll)
@@ -245,7 +248,8 @@ class MegaSenaApp(App):
         try:
             url = f"https://loteriascaixa-api.herokuapp.com/api/{cfg['api_slug']}/latest"
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=5) as response:
+            ctx = ssl.create_default_context(cafile=certifi.where())
+            with urllib.request.urlopen(req, timeout=5, context=ctx) as response:
                 data = json.loads(response.read().decode())
 
             dezenas_sorteadas = [int(n) for n in data.get('dezenas', [])]
@@ -319,7 +323,7 @@ class MegaSenaApp(App):
         scroll.add_widget(label)
         content.add_widget(scroll)
 
-        btn_fechar = StyledButton(text="Fechar", bg_color=(0.15, 0.39, 0.92, 1), size_hint_y=None, height=42)
+        btn_fechar = StyledButton(text="Fechar", bg_color=(0.15, 0.39, 0.92, 1), size_hint_y=None, height=dp(48))
         content.add_widget(btn_fechar)
 
         popup = Popup(
@@ -346,7 +350,7 @@ class MegaSenaApp(App):
         jogos = [item for item in self.history if item.get("jogo", "mega_sena") == self.current_game]
 
         if not jogos:
-            lbl = Label(text="Nenhum jogo salvo nesta modalidade.", color=(0.58, 0.64, 0.72, 1), size_hint_y=None, height=30)
+            lbl = Label(text="Nenhum jogo salvo nesta modalidade.", color=(0.58, 0.64, 0.72, 1), size_hint_y=None, height=dp(32))
             self.history_layout.add_widget(lbl)
             return
 
@@ -371,7 +375,7 @@ class MegaSenaApp(App):
                 markup=True,
                 font_size='12sp',
                 size_hint_y=None,
-                height=35,
+                height=dp(38),
                 color=(0.88, 0.91, 0.95, 1)
             )
             self.history_layout.add_widget(card)
