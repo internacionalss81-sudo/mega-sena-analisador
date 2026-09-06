@@ -159,10 +159,12 @@ class MegaSenaApp(App):
 
         # Botão de Jogo Inteligente (análise online de tendência)
         smart_layout = BoxLayout(spacing=dp(6), size_hint_y=None, height=dp(52))
-        btn_smart = StyledButton(text="🧠 Jogo Inteligente (últimos 3 meses)", bg_color=(0.05, 0.55, 0.55, 1))
-        btn_smart.bind(on_press=self.generate_smart_game)
-        smart_layout.add_widget(btn_smart)
+        self.btn_smart = StyledButton(text="🧠 Jogo Inteligente (últimos 3 meses)", bg_color=(0.05, 0.55, 0.55, 1))
+        self.btn_smart.bind(on_press=self.generate_smart_game)
+        smart_layout.add_widget(self.btn_smart)
         root.add_widget(smart_layout)
+
+        self.smart_cache = {}
 
         # Status
         self.status_label = Label(
@@ -281,6 +283,15 @@ class MegaSenaApp(App):
 
     def generate_smart_game(self, instance):
         cfg = GAMES[self.current_game]
+
+        cache = self.smart_cache.get(self.current_game)
+        if cache and (datetime.now() - cache["timestamp"]) < timedelta(hours=24):
+            idade_min = int((datetime.now() - cache["timestamp"]).total_seconds() / 60)
+            self.status_label.text = f"Status: Usando análise em cache (de {idade_min} min atrás)..."
+            self._on_smart_done(cfg, cache["counts"], cache["analisados"], None, from_cache=True)
+            return
+
+        self.btn_smart.disabled = True
         self.status_label.text = "Status: Analisando resultados dos últimos 3 meses..."
         threading.Thread(target=self._smart_worker, args=(cfg,), daemon=True).start()
 
@@ -326,11 +337,21 @@ class MegaSenaApp(App):
     def _update_smart_progress(self, count):
         self.status_label.text = f"Status: Analisando... {count} concursos lidos"
 
-    def _on_smart_done(self, cfg, counts, analisados, error):
+    def _on_smart_done(self, cfg, counts, analisados, error, from_cache=False):
+        if not from_cache:
+            self.btn_smart.disabled = False
+
         if error is not None or not counts:
             motivo = f"{type(error).__name__}: {error}" if error else "sem dados suficientes"
             self.status_label.text = f"Erro na análise: {motivo}"
             return
+
+        if not from_cache:
+            self.smart_cache[self.current_game] = {
+                "counts": counts,
+                "analisados": analisados,
+                "timestamp": datetime.now(),
+            }
 
         numeros_gerados = self._weighted_pick(cfg, counts)
         str_numbers = " - ".join(f"{n:02d}" for n in numeros_gerados)
@@ -345,7 +366,8 @@ class MegaSenaApp(App):
         self.history.insert(0, game_data)
         self.save_history()
 
-        self.status_label.text = f"Status: Jogo inteligente gerado! ({analisados} concursos analisados)"
+        origem = "cache" if from_cache else "nova análise"
+        self.status_label.text = f"Status: Jogo inteligente gerado! ({analisados} concursos, {origem})"
         self.game_panel.text = f"Jogo Inteligente ({cfg['titulo'].title()}): [b][color=34d399]{str_numbers}[/color][/b]"
         self.game_panel.markup = True
         self.refresh_history_ui()
@@ -457,8 +479,19 @@ class MegaSenaApp(App):
 
         for idx, item in enumerate(jogos, 1):
             dezenas = item.get('dezenas', [])
-            str_dezenas = item.get('str_dezenas', '')
             data_str = item.get('data', '')
+
+            if sorteadas:
+                sorteadas_set = set(sorteadas)
+                partes = []
+                for n in dezenas:
+                    if n in sorteadas_set:
+                        partes.append(f"[color=34d399][b]{n:02d}[/b][/color]")
+                    else:
+                        partes.append(f"{n:02d}")
+                str_dezenas = " - ".join(partes)
+            else:
+                str_dezenas = item.get('str_dezenas', '')
 
             card_text = f"#{idx} [{data_str}] {str_dezenas}"
 
@@ -467,7 +500,7 @@ class MegaSenaApp(App):
                 qtd = len(acertos)
                 minimo_premio = 11 if self.current_game == "lotofacil" else 4
                 if qtd >= minimo_premio:
-                    card_text += f" -> 🎯 [color=34d399][b]GANHOU ({qtd} ACERTOS)[/b][/color]"
+                    card_text += f" -> 🎯 [b]GANHOU ({qtd} ACERTOS)[/b]"
                 else:
                     card_text += f" -> 📊 Acertos: {qtd}"
 
