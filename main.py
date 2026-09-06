@@ -1,12 +1,10 @@
 import os
-os.environ['KIVY_GL_BACKEND'] = 'angle_sdl2'
 os.environ['KIVY_NO_ARGS'] = '1'
 
 import random
 import json
 from datetime import datetime
 import urllib.request
-
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
