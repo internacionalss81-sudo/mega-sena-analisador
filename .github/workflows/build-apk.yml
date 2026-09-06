@@ -22,8 +22,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ccache git libffi-dev libssl-dev python3-dev libsqlite3-dev \
-            build-essential zip unzip autoconf libtool cmake pkg-config zlib1g-dev \
-            openjdk-17-jdk
+            build-essential zip unzip autoconf automake libtool cmake pkg-config zlib1g-dev \
+            openjdk-17-jdk gettext autopoint m4
 
       - name: Install Buildozer and Cython
         run: |
