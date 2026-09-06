@@ -3,12 +3,14 @@ os.environ['KIVY_NO_ARGS'] = '1'
 
 import random
 import json
+import threading
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timedelta
 import urllib.request
 import ssl
 import certifi
 from kivy.app import App
+from kivy.clock import Clock
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
@@ -111,11 +113,14 @@ class MegaSenaApp(App):
         # Painel de Destaque
         self.game_panel = Label(
             text="Escolha uma opção abaixo para começar",
-            font_size='14sp',
+            font_size='12sp',
             color=(0.95, 0.96, 0.98, 1),
             size_hint_y=None,
-            height=dp(55)
+            height=dp(55),
+            halign='center',
+            valign='middle',
         )
+        self.game_panel.bind(size=lambda inst, val: setattr(self.game_panel, 'text_size', val))
         root.add_widget(self.game_panel)
 
         # Campo para quantidade de jogos múltiplos
@@ -151,6 +156,13 @@ class MegaSenaApp(App):
         btn_layout.add_widget(btn_analise)
         btn_layout.add_widget(btn_clear)
         root.add_widget(btn_layout)
+
+        # Botão de Jogo Inteligente (análise online de tendência)
+        smart_layout = BoxLayout(spacing=dp(6), size_hint_y=None, height=dp(52))
+        btn_smart = StyledButton(text="🧠 Jogo Inteligente (últimos 3 meses)", bg_color=(0.05, 0.55, 0.55, 1))
+        btn_smart.bind(on_press=self.generate_smart_game)
+        smart_layout.add_widget(btn_smart)
+        root.add_widget(smart_layout)
 
         # Status
         self.status_label = Label(
@@ -264,6 +276,95 @@ class MegaSenaApp(App):
 
         except Exception as e:
             self.status_label.text = f"Erro: {type(e).__name__}: {e}"
+
+    # ---------- Jogo Inteligente (análise de tendência online) ----------
+
+    def generate_smart_game(self, instance):
+        cfg = GAMES[self.current_game]
+        self.status_label.text = "Status: Analisando resultados dos últimos 3 meses..."
+        threading.Thread(target=self._smart_worker, args=(cfg,), daemon=True).start()
+
+    def _smart_worker(self, cfg):
+        try:
+            ctx = ssl.create_default_context(cafile=certifi.where())
+            url_latest = f"https://loteriascaixa-api.herokuapp.com/api/{cfg['api_slug']}/latest"
+            req = urllib.request.Request(url_latest, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
+                latest = json.loads(resp.read().decode())
+
+            concurso = int(latest.get('concurso'))
+            cutoff = datetime.now() - timedelta(days=90)
+            counts = Counter()
+            analisados = 0
+            tentativas = 0
+            max_tentativas = 150
+
+            while concurso > 0 and tentativas < max_tentativas:
+                tentativas += 1
+                try:
+                    url = f"https://loteriascaixa-api.herokuapp.com/api/{cfg['api_slug']}/{concurso}"
+                    req2 = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req2, timeout=8, context=ctx) as resp2:
+                        result = json.loads(resp2.read().decode())
+
+                    data_concurso = datetime.strptime(result.get('data', ''), '%d/%m/%Y')
+                    if data_concurso < cutoff:
+                        break
+
+                    dezenas = [int(n) for n in result.get('dezenas', [])]
+                    counts.update(dezenas)
+                    analisados += 1
+                    Clock.schedule_once(lambda dt, a=analisados: self._update_smart_progress(a))
+                except Exception:
+                    pass
+                concurso -= 1
+
+            Clock.schedule_once(lambda dt: self._on_smart_done(cfg, counts, analisados, None))
+        except Exception as e:
+            Clock.schedule_once(lambda dt, err=e: self._on_smart_done(cfg, None, 0, err))
+
+    def _update_smart_progress(self, count):
+        self.status_label.text = f"Status: Analisando... {count} concursos lidos"
+
+    def _on_smart_done(self, cfg, counts, analisados, error):
+        if error is not None or not counts:
+            motivo = f"{type(error).__name__}: {error}" if error else "sem dados suficientes"
+            self.status_label.text = f"Erro na análise: {motivo}"
+            return
+
+        numeros_gerados = self._weighted_pick(cfg, counts)
+        str_numbers = " - ".join(f"{n:02d}" for n in numeros_gerados)
+        now = datetime.now().strftime("%d/%m %H:%M")
+
+        game_data = {
+            "jogo": self.current_game,
+            "data": now,
+            "dezenas": numeros_gerados,
+            "str_dezenas": str_numbers,
+        }
+        self.history.insert(0, game_data)
+        self.save_history()
+
+        self.status_label.text = f"Status: Jogo inteligente gerado! ({analisados} concursos analisados)"
+        self.game_panel.text = f"Jogo Inteligente ({cfg['titulo'].title()}): [b][color=34d399]{str_numbers}[/color][/b]"
+        self.game_panel.markup = True
+        self.refresh_history_ui()
+
+    def _weighted_pick(self, cfg, counts):
+        populacao = list(range(1, cfg["range_max"] + 1))
+        pesos = [counts.get(n, 0) + 1 for n in populacao]
+        escolhidos = []
+        for _ in range(cfg["qtd_dezenas"]):
+            total = sum(pesos)
+            r = random.uniform(0, total)
+            acumulado = 0
+            for i, peso in enumerate(pesos):
+                acumulado += peso
+                if acumulado >= r:
+                    escolhidos.append(populacao.pop(i))
+                    pesos.pop(i)
+                    break
+        return sorted(escolhidos)
 
     # ---------- Análise de frequência ----------
 
