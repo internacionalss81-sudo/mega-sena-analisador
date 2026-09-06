@@ -6,7 +6,7 @@ source.dir = .
 source.include_exts = py,json,png,jpg,kv,atlas
 
 version = 1.0.0
-requirements = python3,kivy==2.3.0,urllib3,requests
+requirements = python3,kivy==2.3.0,urllib3,requests,pyjnius
 
 orientation = portrait
 fullscreen = 0
@@ -19,9 +19,8 @@ android.allow_backup = True
 android.private_storage = True
 android.accept_sdk_license = True
 p4a.bootstrap = sdl2
-p4a.branch = master
+p4a.branch = release-2024.01.21
 
 [buildozer]
 log_level = 2
 warn_on_root = 1
-# update p4a build
