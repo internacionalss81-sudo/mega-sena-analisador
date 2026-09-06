@@ -17,15 +17,15 @@ jobs:
         with:
           python-version: "3.11"
 
-      -- name: Dependências
-  run: |
-    sudo apt-get update
-    sudo apt-get install -y build-essential libffi-dev libssl-dev libsqlite3-dev \
-      zlib1g-dev libjpeg-dev libpng-dev ccache ffmpeg libsdl2-dev libsdl2-image-dev \
-      libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev \
-      libavcodec-dev openjdk-17-jdk zip unzip
-    pip install --upgrade pip
-    pip install "buildozer==1.5.0" "python-for-android==2024.1.21" Cython==0.29.33
+      - name: Dependências
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libffi-dev libssl-dev libsqlite3-dev \
+            zlib1g-dev libjpeg-dev libpng-dev ccache ffmpeg libsdl2-dev libsdl2-image-dev \
+            libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev \
+            libavcodec-dev openjdk-17-jdk zip unzip
+          pip install --upgrade pip
+          pip install "buildozer==1.5.0" "python-for-android==2024.1.21" Cython==0.29.33
 
       - name: Gerar APK
         run: |
