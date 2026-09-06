@@ -258,8 +258,8 @@ class MegaSenaApp(App):
             self.status_label.text = f"Concurso {concurso}: {str_sorteadas}"
             self.refresh_history_ui(dezenas_sorteadas)
 
-        except Exception:
-            self.status_label.text = "Erro: Sem conexão com a API de loterias."
+        except Exception as e:
+            self.status_label.text = f"Erro: {type(e).__name__}: {e}"
 
     # ---------- Análise de frequência ----------
 
