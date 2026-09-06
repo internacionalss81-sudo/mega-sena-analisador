@@ -6,13 +6,14 @@ source.dir = .
 source.include_exts = py,json,png,jpg,kv,atlas
 
 version = 1.0.0
-requirements = python3,kivy,urllib3,requests
+requirements = python3==3.11.8,kivy==2.3.0,urllib3,requests
 
 orientation = portrait
 fullscreen = 0
 
 android.api = 33
 android.minapi = 21
+android.ndk = 25b
 android.archs = arm64-v8a
 android.allow_backup = True
 android.private_storage = True
