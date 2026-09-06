@@ -30,6 +30,8 @@ jobs:
           ANDROID_NDK_HOME: ""
           ANDROID_NDK_ROOT: ""
           ANDROID_NDK: ""
+          CFLAGS: "-Wno-error=implicit-function-declaration"
+          CPPFLAGS: "-Wno-error=implicit-function-declaration"
         run: |
           buildozer android debug
 
