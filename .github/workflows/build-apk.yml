@@ -43,10 +43,19 @@ jobs:
             patch \
             wget
 
-      - name: Limpar compilação anterior
+      - name: Limpar apenas builds anteriores do app (preserva cache de SDK/NDK)
         run: |
-          rm -rf .buildozer
           rm -rf bin
+
+      - name: Cache Buildozer global e SDK/NDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            .buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            buildozer-${{ runner.os }}-
 
       - name: Instalar Buildozer
         run: |
@@ -58,8 +67,6 @@ jobs:
         run: |
           echo "===== BUILDOZER ====="
           cat buildozer.spec
-          echo "===== REQUIREMENTS ====="
-          cat requirements.txt
           echo "===== WORKFLOW ====="
           head -20 .github/workflows/build-apk.yml
 

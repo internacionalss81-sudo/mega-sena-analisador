@@ -20,6 +20,7 @@ android.archs = arm64-v8a
 
 android.allow_backup = True
 android.private_storage = True
+android.permissions = INTERNET
 
 p4a.bootstrap = sdl2
 android.accept_sdk_license = True

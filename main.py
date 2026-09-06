@@ -36,7 +36,7 @@ class StyledButton(Button):
 
 class MegaSenaApp(App):
     def build(self):
-        self.history_file = "history.json"
+        self.history_file = os.path.join(self.user_data_dir, "history.json")
         self.load_history()
 
         root = BoxLayout(orientation='vertical', padding=15, spacing=10)
